@@ -1,0 +1,113 @@
+Prompt trace for the HLDD AI Agent project
+
+1. Create & automatically setup the project in Python as backend and React JS as frontend.
+2. Create one AI Agent having feature to upload the High Level Design Document (HLDD).
+3. Read the data from the uploaded HLDD and create a dashboard showing bullet points from the HLDD, including title, functional requirements, project management tool, technology stack, and acceptance criteria.
+4. Read the data from the uploaded HLDD and create features to develop, such as IPMA#001, IPMA#002, with title, description, and acceptance criteria.
+5. Read the data from the uploaded HLDD and create stories under each feature, calculating effort and generating identifiers like E-CRM#001 and E-CRM#002.
+6. Read the data from the uploaded HLDD and create separate testing stories for each development story for assignment to the testing team.
+7. Ensure each story has no more than 3 story points, splitting work into smaller stories when needed.
+8. Read the data from the uploaded HLDD and create a tab showing the architecture diagram.
+9. Propose and create the project structure by referring to the technology stack and project tool specified in the uploaded HLDD.
+10. Generate README instructions covering build and deployment.
+11. Generate prompt.txt capturing the prompts used to build and execute the project.
+12. Update the architecture diagram so it reflects the workflow implied by the HLDD technology stack, rather than the upload-processing pipeline.
+13. Remove story points from feature entries so features remain parent-level deliverables.
+14. Expand development and testing stories into more detailed task-level breakdowns tied to the HLDD stack.
+15. Add icon-rich, industry-standard architecture visuals for each technology layer.
+16. Calculate and display development, testing, and combined story points for each feature in the Features tab.
+17. Create `.github/copilot-instructions.md` so Microsoft 365 Copilot can configure and run the application.
+18. Replace the generic Copilot guidance with an explicit step-by-step run prompt so Agent mode can execute the app reliably.
+19. Keep README.md and prompt.txt aligned with the latest architecture, feature summary, and Copilot run instructions.
+20. Add ready-to-paste Copilot Agent prompt messages to README.md so the chat workflow can be run directly without relying on the instructions file.
+21. Make the architecture diagram explicit for AWS and other cloud/runtime details, including cloud platform, orchestration, and container runtime relationships.
+22. Update the Architecture tab legend so it reflects and visually labels the new cloud and runtime nodes dynamically.
+23. Add a short text hint under the legend explaining what each category means.
+24. Make the cloud badge or the cloud platform node clickable in the Architecture tab and expand it into a richer inline service list for the selected cloud provider.
+25. Add enterprise-style cloud service status badges and a compact recommendation summary so the expanded view reads like a platform review panel.
+26. Add provider-specific database recommendations and keep the cloud badge or cloud platform node interaction consistent across the architecture view.
+27. Preserve Google Cloud in the parser so GCP recommendations and the GCP Cloud node are generated correctly.
+28. Make the architecture diagram easier to read by increasing spacing, contrast, and legibility in the Mermaid output.
+29. Generate a Git/Bitbucket-ready project structure that includes root repository files and package metadata.
+30. Render the proposed project structure as a nested directory tree in the Structure tab and refresh the Mermaid layout so the architecture diagram is easier to read.
+31. Add frontend payload sync so the dashboard auto-refreshes every 10 seconds and includes a manual Refresh payload action for backend-side uploads.
+32. Add a visible Last refreshed at indicator, rework the Proposed Project Structure layout into a summary + tree view, and align the upload card actions.
+33. Add a Chatbot Agent tab that references the uploaded HLDD document, recommends the best-fit model for the current stack, and uses a live model when configured or a local fallback otherwise.
+34. Make the Refresh payload action clear the dashboard when no document is uploaded or when the user resets the current payload state.
+35. Remove the automatic 10-second refresh interval and keep the Refresh payload action as a reset control.
+36. Update the documentation to explicitly call out that the current app uses optional OpenAI/Gemini LLM support, no RAG, and no MCP integration.
+37. Enhance the Chatbot Agent so it can answer questions about project functionality, preferred frameworks and related services, alternative frontend/backend/cloud choices, cost breakdowns, and the tradeoffs around efficiency, security, and turnaround time.
+38. Preserve additional technology aliases during parsing so the dashboard reflects Oracle, .NET, SQL, SQL Server, and other declared stack entries accurately.
+39. Remove the CI/CD Pipeline tile from the dashboard while keeping repository data available in the parsed payload.
+40. Add a Repository node to the Architecture view and surface it in the legend.
+41. Make the Chatbot Agent return `Out of Scope Information` when the prompt is unrelated to the uploaded HLDD context.
+42. Harden PDF parsing so inline technology stack text is split correctly and normalized, including Azure-related entries.
+43. Read all technologies listed under the Technology Stack section, including entries that appear in bullet headers, punctuation-formatted headers, or compact GCP-style text.
+44. Verify the live upload path against the running backend and confirm that compact `Technology Stack: GCP, React, FastAPI` input is returned as `['GCP', 'React', 'FastAPI']` and rendered in the architecture diagram as a `GCP Cloud` node with cloud recommendations.
+45. Modernize the GUI with glassmorphism design, animated gradients, glow effects, improved spacing, and smooth transitions. Add an animated inline SVG AI chatbot icon to the Chatbot Agent tab, contextual SVG icons to all tab buttons, and animated loading dots for the chatbot generation state.
+46. Change the Structure tab from a side-by-side grid to a stacked vertical layout (tree on top, pill-style overview below). Increase the hero "HLDD AI Agent" font size (1.3rem) and robot icon (44px). Minimize the Chatbot Agent icon from 72px to 44px.
+47. Make every legend pill in the Architecture tab clickable — clicking a non-cloud pill (Frontend, Backend, Data Store, Repository, Runtime, Container, Delivery) expands a detail card showing the technology descriptions for each node in that layer.
+48. Revert Structure tab back to a side-by-side grid layout with the directory tree on the left and the "Quick overview" card on the right.
+49. Increase the architecture diagram card size (min-height 480px, larger padding). Soften legend detail text colors — header to blue-300 (#93c5fd), body to slate-400 (#94a3b8), node label to slate-300 (#cbd5e1) for improved readability.
+50. Add download buttons to all tabs: PDF export for Dashboard, Features, Stories, Testing, Architecture, and Structure tabs. Features, Stories, and Testing additionally support Excel (.xlsx) and plain-text (.txt) export. Install jspdf, html2canvas, and xlsx dependencies.
+51. Increase architecture diagram node label font size (14px → 16px, edge labels 14px). Change node label fill/color from white to light blue (#93c5fd), edge labels to sky-300 (#7dd3fc), cluster labels to violet-300 (#c4b5fd).
+52. Reduce architecture diagram default size (min-height 480px → 280px, padding 28px → 20px). Remove maximize/minimize double-click toggle. Download buttons already present across all tabs.
+53. Add click-to-pop-out modal for Architecture diagram — clicking the mermaid-card opens a fullscreen overlay with a larger cloned diagram; clicking Close or the overlay background dismisses it.
+54. Add Add/Edit/Delete inline editing to Features, Stories, and Testing tabs. Each table gains an Actions column with Edit and Del buttons; clicking Edit turns cells into input fields. An Add button above each table inserts a new row in edit mode. Data is stored in local state synced from the API payload; computed totals update reactively.
+55. Add inline SVG icons to PDF (document icon), Excel (spreadsheet icon), and TXT (text-file icon) download buttons for better visual recognition.
+56. Reduce hero subtitle font size (1.35rem → 1.05rem). Increase hero "HLDD AI Agent" text (1.3rem → 1.6rem) and robot icon (44px → 54px) with stronger glow.
+57. Add cloud service cost comparison to Chatbot Agent — detects cost/price/instance/EC2/VM keywords and returns a cross-provider overview covering all major AWS, Azure, and GCP service categories (compute, storage, databases, serverless, CDN, containers, API gateway, AI/ML, analytics, monitoring, data transfer) with direct links to each provider's pricing calculator, free tier, and cost optimization tools. Includes general cost guidance on reserved/spot/discount pricing models, hidden egress charges, and regional variance.
+
+Execution commands used:
+- Backend dependencies: pip install -r backend/requirements.txt
+- Frontend dependencies: cd frontend && npm install
+- Backend start: cd backend && /Users/jaimin/Documents/HLDD-AI/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+- Frontend start: cd frontend && npm run dev -- --host 0.0.0.0 --port 3000
+
+Latest update notes:
+- The architecture diagram now reflects the HLDD technology workflow and uses icon-rich, enterprise-style visuals with stronger formal layout and styling.
+- Feature entries are parent-level deliverables and now show separate development, testing, and combined story point totals.
+- Development and testing stories now include more detailed, stack-aware task breakdowns.
+- `.github/copilot-instructions.md` was expanded into a step-by-step Agent-mode run guide for Microsoft 365 Copilot.
+- README.md now includes one-shot and detailed ready-to-paste Copilot Agent prompt messages for direct chat usage.
+- The architecture diagram now explicitly renders AWS Cloud and related cloud/runtime relationships in the generated Mermaid output.
+- The Architecture tab legend now reflects the cloud/runtime node types dynamically in the UI.
+- The architecture diagram was reworked for better legibility with clearer spacing, stronger contrast, and a more readable layout.
+- The Structure tab now renders the proposed project structure as a nested directory tree for easier scanning.
+- The generated structure now follows the Enterprise Directory Map layout, including GitHub workflows, backend modules, frontend feature folders, docs, and root-level orchestration files.
+- The dashboard no longer renders a standalone CI/CD Pipeline card.
+- The architecture view now includes a Repository node and legend entry derived from the parsed HLDD repository data.
+- The Chatbot Agent now returns `Out of Scope Information` when the prompt is unrelated to the uploaded HLDD context.
+- Google Cloud is now preserved during parsing, so GCP recommendations and the GCP Cloud node are generated correctly.
+- The clickable cloud badge or cloud platform node now expands into a richer inline service list that highlights probable services for the selected cloud provider.
+- The expanded cloud view now includes status badges, per-service recommendation microcopy, provider-specific database suggestions, and a compact recommendation summary to make it feel more enterprise-style.
+- The generated project structure now includes repository-friendly files such as `.gitignore`, `README.md`, `frontend/package.json`, and `backend/requirements.txt` so it can be uploaded directly to Git or Bitbucket.
+- A short explanatory hint now appears under the legend to explain the meaning of each category.
+- The frontend no longer auto-refreshes the HLDD payload on a timer. The manual Refresh payload action now clears the current dashboard view instead.
+- The Refresh payload action now clears the dashboard view when the current payload should be reset.
+- A Chatbot Agent tab now references the uploaded HLDD context and recommends the best-fit model for the current stack.
+- The Chatbot Agent now answers questions about project functionality, preferred frameworks and related services, alternative frontend/backend/cloud choices, cost breakdowns, and the tradeoffs around efficiency, security, and turnaround time.
+- The parser now preserves additional technology aliases such as Python, Oracle, .NET, SQL, and SQL Server so those entries appear in the dashboard and chatbot context.
+- PDF uploads now preserve inline technology stack values such as Azure, React, and Python even when the extraction output collapses them onto one line.
+- Azure variants such as `Microsoft Azure Cloud` and `Azure Cloud` are normalized to `Azure` so the dashboard and architecture logic receive the expected value.
+- The parser now reads every technology listed under `Technology Stack`, including entries formatted as bullets, punctuation-based headers, or compact GCP-style text.
+- README.md and prompt.txt were refreshed to document the updated behavior, architecture changes, optional LLM configuration, the current LLM/RAG/MCP status, the verified local run flow, and the current GCP upload validation evidence.
+- GUI overhaul: glassmorphism card backgrounds, animated gradient text, glow effects, smoother transitions, custom scrollbar, animated fade-in, improved responsive layout, and an SVG AI chatbot icon with pulsing animation. Tab buttons now include contextual SVG icons and animated loading dots.
+- Enlarged the hero "HLDD AI Agent" text and robot icon; reduced the hero subtitle font size for better visual hierarchy. Replaced the chatbot tab icon with a neural network node graph SVG.
+- Replaced the hero robot icon with a multi-color gradient version (blue→purple→pink) with grey eyes. Replaced the chatbot icon with an AI robot SVG (72px) with multi-color gradient details and pulsing animation.
+- Changed the Structure tab from side-by-side grid to a stacked vertical layout (full-width directory tree above inline pill-style quick overview). Increased hero "HLDD AI Agent" font size to 1.3rem and icon to 44px. Reduced Chatbot Agent icon from 72px to 44px.
+- Made every legend pill in the Architecture tab clickable — non-cloud pills toggle a detail card with the technology description for each node in that layer (Frontend, Backend, Data Store, Repository, Runtime, Container, Delivery).
+- Reverted the Structure tab to a side-by-side grid: directory tree on the left, "Quick overview" card on the right.
+- Increased the architecture diagram container size (min-height 320px → 480px, padding 20px → 28px, card padding 24px → 28px). Softened legend detail text colors: header (#f8fafc → #93c5fd), body (#cbd5e1 → #94a3b8), node label (#e2e8f0 → #cbd5e1).
+- Added download buttons to all tabs: PDF export for Dashboard, Features, Stories, Testing, Architecture, Structure. Features, Stories, Testing additionally support Excel (.xlsx) and TXT (.txt) export via jspdf + html2canvas + xlsx.
+- Increased architecture diagram node label font size to 16px (edge labels 14px). Changed Mermaid SVG text from white to light blue: node labels #93c5fd, edge labels #7dd3fc, cluster labels #c4b5fd.
+- Reduced default architecture diagram size (min-height 480px → 280px, padding 28px → 20px). Removed maximize/minimize double-click toggle. Added download buttons across all tabs: PDF for Dashboard, Architecture, Structure; PDF + Excel + TXT for Features, Stories, Testing.
+- Added click-to-pop-out modal for Architecture diagram: clicking the card opens a fullscreen overlay with a cloned SVG at larger size; overlay or Close button dismisses it.
+- Added Add/Edit/Delete inline editing for Features, Stories, and Testing tabs. Each table has an Actions column (Edit/Del). Edit mode turns cells into inputs. Add button above each table inserts a new row with auto-generated ID. Data stored in local state synced from API; totals and exports use local data.
+- Added inline SVG icons to PDF (document), Excel (spreadsheet), and TXT (text file) download buttons with inline-flex gap styling.
+- Reduced hero subtitle font size (1.35rem → 1.05rem). Increased hero "HLDD AI Agent" text (1.3rem → 1.6rem) and robot icon (44px → 54px) with stronger glow.
+- Replaced hardcoded cloud instance pricing with a broader cloud service cost comparison. Detects keywords (cost, price, EC2, VM, compute, Azure, GCP) and returns a cross-provider overview covering all major AWS, Azure, and GCP service categories (compute, storage, databases, serverless, CDN, containers, API gateway, AI/ML, analytics, monitoring, data transfer) with direct links to pricing calculators, free tiers, and cost optimization tools. Includes general cost guidance on reserved/spot pricing, hidden egress charges, and regional variance.
+60. Added JIRA integration: a `Create in JIRA` button in the Features tab that calls a new `POST /api/jira/create-features` endpoint, which creates JIRA issues in the SCRUM project for each feature. Requires `JIRA_EMAIL` and `JIRA_API_TOKEN` environment variables. The button shows per-feature success/failure results (JIRA keys and URLs) after the sync completes.
+61. Restarted the backend with JIRA_EMAIL and JIRA_API_TOKEN environment variables. Verified the integration works — test feature mapped to SCRUM-5 in the JIRA project.
+62. Added `POST /api/jira/create-stories` endpoint and `Create in JIRA` button in the Stories tab. Stories are created as `Story` issue type linked to their parent Epic via the `parent` field. The frontend stores the feature-to-Epic mapping (`jiraEpicMapping`) from the feature sync and sends it with the story sync request so each story is correctly parented to its feature's Epic.
+63. Added `POST /api/jira/create-testing-stories` endpoint and `Create in JIRA` button in the Testing tab. Testing stories are created as `Subtask` issue type (id=10002) linked to their parent Story via the `parent` field. The frontend stores the story-to-JIRA-key mapping (`jiraStoryMapping`) from the story sync and sends it with the testing sync request so each testing story is correctly parented to its development Story.

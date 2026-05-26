@@ -1,0 +1,31 @@
+# Sample HLDD Template
+
+## Title
+Sample HLDD for E-CRM Project
+
+## Summary
+This document describes the high-level design for a customer relationship management project.
+
+## Functional Requirements
+- Manage customer onboarding workflow
+- Generate reporting dashboards
+- Integrate with CRM and billing systems
+
+## Project Management Tool
+- Jira
+
+## Technology Stack
+- React
+- FastAPI
+- PostgreSQL
+- Docker
+
+## Acceptance Criteria
+- The onboarding workflow is documented and implemented
+- Dashboards provide updated metrics
+- CRM and billing integrations are working as expected
+
+## Architecture Notes
+- Frontend communicates with backend APIs
+- Backend stores structured project artifacts
+- AI Agent enriches HLDD parsing and planning
