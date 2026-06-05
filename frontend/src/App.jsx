@@ -102,6 +102,26 @@ function buildProjectTree(projectStructure = []) {
   return root
 }
 
+function serializeTreeToText(node, prefix = '', isLast = true, isRoot = true) {
+  if (isRoot) {
+    let result = node.name + (node.isDirectory ? '/' : '') + '\n'
+    const children = node.children || []
+    for (let i = 0; i < children.length; i++) {
+      result += serializeTreeToText(children[i], '', i === children.length - 1, false)
+    }
+    return result
+  }
+
+  const connector = isLast ? '└── ' : '├── '
+  let result = prefix + connector + node.name + (node.isDirectory ? '/' : '') + '\n'
+  const children = node.children || []
+  const childPrefix = prefix + (isLast ? '    ' : '│   ')
+  for (let i = 0; i < children.length; i++) {
+    result += serializeTreeToText(children[i], childPrefix, i === children.length - 1, false)
+  }
+  return result
+}
+
 function ProjectTreeNode({ node }) {
   return (
     <li className="structure-tree-item">
@@ -117,6 +137,14 @@ function ProjectTreeNode({ node }) {
       )}
     </li>
   )
+}
+
+function flattenStructureToRows(node, depth = 0, rows = []) {
+  rows.push({ name: node.name, type: node.isDirectory ? 'folder' : 'file', depth })
+  for (const child of (node.children || [])) {
+    flattenStructureToRows(child, depth + 1, rows)
+  }
+  return rows
 }
 
 function getProjectStructureSummary(root) {
@@ -1654,6 +1682,29 @@ flowchart LR
               </div>
               <div className="download-bar">
                 <button type="button" className="download-btn" onClick={() => downloadPdf(structureRef.current, 'project-structure')}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg> PDF</button>
+                <button type="button" className="download-btn" onClick={async () => {
+                  const structure = data?.project_structure || []
+                  if (!structure.length) return
+                  try {
+                    const res = await fetch('http://localhost:8000/api/download/structure', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ project_structure: structure }),
+                    })
+                    if (!res.ok) throw new Error('Download failed')
+                    const blob = await res.blob()
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = 'project-structure.zip'
+                    document.body.appendChild(a)
+                    a.click()
+                    document.body.removeChild(a)
+                    URL.revokeObjectURL(url)
+                  } catch (e) {
+                    console.error('Structure download error:', e)
+                  }
+                }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> ZIP</button>
               </div>
               <div className="structure-summary">
                 <div className="structure-stat">

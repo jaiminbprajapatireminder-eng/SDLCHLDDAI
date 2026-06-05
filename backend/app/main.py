@@ -3,6 +3,7 @@ import io
 import json
 import os
 from pathlib import Path
+import zipfile
 from typing import Dict
 
 from dotenv import load_dotenv
@@ -13,6 +14,7 @@ from urllib.request import Request, urlopen
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.gemini_dataflow import call_gemini_dataflow
@@ -1213,6 +1215,10 @@ class AgentRequest(BaseModel):
     confirm: bool = False
 
 
+class DownloadStructureRequest(BaseModel):
+    project_structure: list[str] = []
+
+
 class JiraCreateRequest(BaseModel):
     features: list[Dict[str, object]] = []
 
@@ -1576,6 +1582,26 @@ def jira_create_features(request: JiraCreateRequest):
         "success_count": success_count,
         "failure_count": len(results) - success_count,
     }
+
+
+@app.post("/api/download/structure")
+def download_structure(req: DownloadStructureRequest):
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for path in req.project_structure:
+            normalized = path.strip().replace("\\", "/")
+            if normalized.endswith("/"):
+                dirname = normalized.rstrip("/")
+                zf.writestr(f"{dirname}/", "")
+            else:
+                zf.writestr(normalized, "")
+
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=project-structure.zip"},
+    )
 
 
 @app.get("/api/hldd")
