@@ -544,11 +544,21 @@ flowchart LR
     if (!file) return
     setAgentFile(file)
     try {
-      const text = await file.text()
-      setAgentFileText(text)
-      setAgentMessages(prev => [...prev, { role: 'user', content: `Uploaded: ${file.name} (${text.length} chars)` }])
-    } catch {
-      setAgentError('Could not read file as text. Try .txt or .md files.')
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('http://localhost:8000/api/agent/parse-document', {
+        method: 'POST',
+        body: formData,
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.detail || 'Parsing failed')
+      }
+      const data = await res.json()
+      setAgentFileText(data.text)
+      setAgentMessages(prev => [...prev, { role: 'user', content: `Uploaded: ${data.filename} (${data.length} chars)` }])
+    } catch (err) {
+      setAgentError(err.message || 'Could not read file.')
     }
   }
 

@@ -1237,6 +1237,17 @@ class JiraConfirmRequest(BaseModel):
     plan: dict = {}
 
 
+@app.post("/api/agent/parse-document")
+async def agent_parse_document(file: UploadFile = File(...)):
+    try:
+        text = await _read_upload(file)
+        return {"text": text, "filename": file.filename, "length": len(text)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Could not parse file: {e}")
+
+
 @app.post("/api/agent")
 def agent_endpoint(request: AgentRequest):
     try:
