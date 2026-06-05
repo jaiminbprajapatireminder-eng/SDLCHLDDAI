@@ -556,7 +556,8 @@ flowchart LR
       }
       const data = await res.json()
       setAgentFileText(data.text)
-      setAgentMessages(prev => [...prev, { role: 'user', content: `Uploaded: ${data.filename} (${data.length} chars)` }])
+      const shortName = data.filename.replace(/\.(pdf|docx|txt|md)$/i, '')
+      setAgentMessages(prev => [...prev, { role: 'user', content: `Uploaded document (${data.length} chars): ${shortName}` }])
     } catch (err) {
       setAgentError(err.message || 'Could not read file.')
     }
