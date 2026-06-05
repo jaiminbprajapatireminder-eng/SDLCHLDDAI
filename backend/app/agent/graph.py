@@ -8,36 +8,52 @@ from .state import AgentState
 from .tools import TOOLS
 from .llm import build_agent_llm
 from .prompts import AGENT_SYSTEM_PROMPT
+from app.parser import parse_hldd_document
+from app.generator import generate_project_plan
 
 
 def agent_node(state: AgentState):
     llm = build_agent_llm(TOOLS)
 
     raw_text = (state.get("raw_hldd_text") or "")
-    context_block = ""
-    if raw_text:
-        truncated = raw_text[:1500] + "\n\n[... truncated ...]" if len(raw_text) > 1500 else raw_text
-        context_block += f"""
-## HLDD Document Text (truncated preview)
-{truncated}
+    parsed_hldd = state.get("parsed_hldd")
+    project_plan = state.get("project_plan")
 
-Tip: Use retrieve_hldd_context tool for full vector-search access to the complete document.
-"""
-    if state.get("parsed_hldd"):
-        p = state["parsed_hldd"]
+    updates = {}
+    if raw_text and not parsed_hldd:
+        try:
+            parsed_hldd = parse_hldd_document(raw_text)
+            project_plan = generate_project_plan(parsed_hldd)
+            updates["parsed_hldd"] = parsed_hldd
+            updates["project_plan"] = project_plan
+        except Exception:
+            pass
+
+    context_block = ""
+    if parsed_hldd:
+        p = parsed_hldd
+        summary_preview = (p.get("summary") or "")[:700]
         context_block += f"""
-## Current HLDD Context
+## Parsed HLDD Document
 Title: {p.get('title', 'N/A')}
+Summary: {summary_preview + ('...' if len(p.get('summary') or '') > 700 else '')}
 Tech Stack: {', '.join(p.get('technology_stack', ['N/A']))}
-Functional Requirements: {len(p.get('functional_requirements', []))}
+Functional Requirements ({len(p.get('functional_requirements', []))}): {', '.join(f['id'] for f in p.get('functional_requirements', []))}
+Acceptance Criteria ({len(p.get('acceptance_criteria', []))})
+
+Architecture Notes:
+{p.get('architecture_notes', 'N/A')[:500]}
 """
-    if state.get("project_plan"):
-        plan = state["project_plan"]
+    if project_plan:
+        plan = project_plan
+        features = plan.get("features", [])
+        stories = plan.get("stories", [])
+        testing_stories = plan.get("testing_stories", [])
         context_block += f"""
-## Current Project Plan
-Features: {len(plan.get('features', []))}
-Development Stories: {len(plan.get('stories', []))}
-Testing Stories: {len(plan.get('testing_stories', []))}
+## Project Plan
+Features ({len(features)}): {', '.join(f.get('id', '') + ': ' + (f.get('title', '') or '')[:60] for f in features[:5])}{'...' if len(features) > 5 else ''}
+Development Stories: {len(stories)}
+Testing Stories: {len(testing_stories)}
 """
 
     system_msg = AGENT_SYSTEM_PROMPT + context_block
@@ -78,7 +94,9 @@ Testing Stories: {len(plan.get('testing_stories', []))}
             messages.append({"role": "user", "content": str(msg.content) if hasattr(msg, 'content') else str(msg)})
 
     response = llm.invoke(messages)
-    return {"messages": [response]}
+    result = {"messages": [response]}
+    result.update(updates)
+    return result
 
 
 def process_tool_results(state: AgentState):
