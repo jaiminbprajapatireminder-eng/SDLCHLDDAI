@@ -33,13 +33,17 @@ def agent_node(state: AgentState):
     if parsed_hldd:
         p = parsed_hldd
         summary_preview = (p.get("summary") or "")[:700]
+        fr_list = p.get("functional_requirements", [])
+        fr_preview = ', '.join((f if isinstance(f, str) else f.get('id', str(f)))[:60] for f in fr_list[:6])
+        ac_list = p.get("acceptance_criteria", [])
+        ac_first = (ac_list[0] if ac_list else 'N/A')[:80]
         context_block += f"""
 ## Parsed HLDD Document
 Title: {p.get('title', 'N/A')}
 Summary: {summary_preview + ('...' if len(p.get('summary') or '') > 700 else '')}
 Tech Stack: {', '.join(p.get('technology_stack', ['N/A']))}
-Functional Requirements ({len(p.get('functional_requirements', []))}): {', '.join(f['id'] for f in p.get('functional_requirements', []))}
-Acceptance Criteria ({len(p.get('acceptance_criteria', []))})
+Functional Requirements ({len(fr_list)}): {fr_preview}{'...' if len(fr_list) > 6 else ''}
+Acceptance Criteria ({len(ac_list)}): {ac_first}{'...' if len(ac_list) > 1 else ''}
 
 Architecture Notes:
 {p.get('architecture_notes', 'N/A')[:500]}
