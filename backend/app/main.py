@@ -2,7 +2,12 @@ import base64
 import io
 import json
 import os
+from pathlib import Path
 from typing import Dict
+
+from dotenv import load_dotenv
+
+load_dotenv(dotenv_path=Path(__file__).resolve().parents[2] / ".env")
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -13,6 +18,10 @@ from pydantic import BaseModel
 from app.gemini_dataflow import call_gemini_dataflow
 from app.generator import generate_project_plan
 from app.parser import parse_hldd_document
+from app.agent.graph import build_agent
+from app.agent.state import AgentState
+from app.rag import retriever
+from langchain_core.messages import AIMessage, HumanMessage
 
 app = FastAPI(title="HLDD AI Agent")
 
@@ -1073,6 +1082,42 @@ def health_check():
     return {"status": "ok", "service": "HLDD AI Agent"}
 
 
+class MCPRequest(BaseModel):
+    tool: str
+    arguments: dict = {}
+
+
+@app.post("/mcp/call")
+def mcp_endpoint(req: MCPRequest):
+    """MCP tool dispatcher. Available: parse_hldd, generate_plan, ask_chatbot."""
+    try:
+        if req.tool == "parse_hldd":
+            text = req.arguments.get("text", "")
+            if not text:
+                raise HTTPException(status_code=400, detail="Missing 'text' argument")
+            parsed = parse_hldd_document(text)
+            return {"result": parsed}
+
+        elif req.tool == "generate_plan":
+            data = req.arguments.get("data", {})
+            plan = generate_project_plan(data)
+            return {"result": plan}
+
+        elif req.tool == "ask_chatbot":
+            question = req.arguments.get("question", "")
+            context = req.arguments.get("context", "")
+            priority = req.arguments.get("priority", "balanced")
+            response, _ = call_gemini_dataflow(context, question, priority)
+            return {"result": response or "No response"}
+
+        else:
+            raise HTTPException(status_code=400, detail=f"Unknown MCP tool: {req.tool}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"MCP error: {e}")
+
+
 @app.post("/api/upload")
 async def upload_hldd(file: UploadFile = File(...)):
     try:
@@ -1089,6 +1134,13 @@ async def upload_hldd(file: UploadFile = File(...)):
     payload = generate_project_plan(parsed)
     LATEST_PAYLOAD.clear()
     LATEST_PAYLOAD.update(payload)
+
+    # Index raw HLDD text into vector store for RAG retrieval
+    try:
+        retriever.ingest(raw_text)
+    except Exception:
+        pass  # RAG indexing is non-critical; upload succeeds regardless
+
     return payload
 
 
@@ -1154,6 +1206,13 @@ def chatbot_agent(request: ChatbotRequest):
     }
 
 
+class AgentRequest(BaseModel):
+    prompt: str
+    hldd_text: str = ""
+    history: list[Dict[str, str]] = []
+    confirm: bool = False
+
+
 class JiraCreateRequest(BaseModel):
     features: list[Dict[str, object]] = []
 
@@ -1166,6 +1225,100 @@ class JiraCreateStoriesRequest(BaseModel):
 class JiraCreateTestingRequest(BaseModel):
     testing_stories: list[Dict[str, object]] = []
     story_mapping: dict[str, str] = {}
+
+
+class JiraConfirmRequest(BaseModel):
+    plan: dict = {}
+
+
+@app.post("/api/agent")
+def agent_endpoint(request: AgentRequest):
+    try:
+        agent = build_agent()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    history_messages = []
+    for msg in request.history or []:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        if role == "user":
+            history_messages.append(HumanMessage(content=content))
+        else:
+            history_messages.append(AIMessage(content=content))
+
+    history_messages.append(HumanMessage(content=request.prompt))
+
+    state = AgentState(
+        raw_hldd_text=request.hldd_text or "",
+        parsed_hldd=None,
+        project_plan=None,
+        epic_mapping={},
+        story_mapping={},
+        messages=history_messages,
+        user_input=request.prompt,
+        jira_pending_scope=None,
+        jira_confirmed=request.confirm,
+    )
+
+    try:
+        result = agent.invoke(state, {"recursion_limit": 50})
+    except Exception as e:
+        err_str = str(e)
+        if "rate_limit_exceeded" in err_str or "Request too large" in err_str:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Groq API rate limit exceeded. The prompt is too large for the free tier. "
+                       f"Try a shorter HLDD document or upgrade your Groq plan. ({err_str[:200]})"
+            )
+        raise HTTPException(status_code=500, detail=f"Agent execution failed: {e}")
+
+    last_message = result["messages"][-1].content if result["messages"] else ""
+
+    jira_pending = result.get("jira_pending_scope")
+
+    return {
+        "response": last_message,
+        "jira_pending": jira_pending if jira_pending else None,
+        "state": {
+            "parsed": result.get("parsed_hldd"),
+            "plan": result.get("project_plan"),
+            "epics": result.get("epic_mapping"),
+            "stories": result.get("story_mapping"),
+        },
+    }
+
+
+@app.post("/api/agent/confirm-jira")
+def agent_confirm_jira(request: JiraConfirmRequest):
+    """Execute batch JIRA creation after user approval."""
+    plan = request.plan or {}
+    if not plan:
+        raise HTTPException(status_code=400, detail="No project plan provided.")
+
+    try:
+        from app.agent.tools import batch_create_jira
+        result = batch_create_jira(plan)
+        LATEST_PAYLOAD["epic_mapping"] = result["epic_mapping"]
+        LATEST_PAYLOAD["story_mapping"] = result["story_mapping"]
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"JIRA batch creation failed: {e}")
+
+
+@app.post("/api/extract-text")
+async def extract_text(file: UploadFile = File(...)):
+    try:
+        raw_text = await _read_upload(file)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not raw_text or not raw_text.strip():
+        raise HTTPException(status_code=400, detail="The uploaded document is empty.")
+
+    return {"text": raw_text, "filename": file.filename or "upload"}
 
 
 @app.post("/api/jira/create-testing-stories")

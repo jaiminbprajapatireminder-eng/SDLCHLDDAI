@@ -8,7 +8,7 @@ This repository contains a Python FastAPI backend and a React + Vite frontend fo
 - **Download options** — PDF export on all tabs; Features, Stories, and Testing additionally support Excel (.xlsx) and plain-text (.txt) export
 - **AI Chatbot icon** — animated inline SVG robot icon (44px) with multi-color gradient details in the Chatbot Agent tab with a pulsing animation
 - **Hero AI icon** — animated inline SVG robot icon next to the prominent "HLDD AI Agent" heading, featuring a multi-color gradient (blue→purple→pink) and amber/pink glowing eyes with floating animation
-- **Tab icons** — contextual SVG icons for each dashboard tab (grid, checkmark, file, test, code, structure, chat)
+- **Tab icons** — contextual SVG icons for each dashboard tab: dashboard (grid), features (checkmark), stories (file), testing (test), architecture (code), structure (compass), agent (robot), chatbot (chat)
 - **Loading animations** — animated dot indicators for chatbot generation and status message pulse effects
 - Upload HLDD documents in `.txt`, `.md`, `.docx`, or `.pdf`
 - Extract title, functional requirements, project management tool, technology stack, acceptance criteria, and architecture notes
@@ -28,16 +28,18 @@ This repository contains a Python FastAPI backend and a React + Vite frontend fo
   - A Git/Bitbucket-ready project structure with root-level repository files and platform-specific package metadata
   - A nested directory tree in the `Structure` tab so the proposed repository layout is easy to scan
   - A manual `Refresh payload` action that clears the current dashboard view so the UI can be reset when no document is uploaded or the user wants to wipe the current payload
-- A `Chatbot Agent` tab that references the uploaded HLDD context, recommends the best-fit model for the current stack, and answers questions about project functionality, framework choices, alternate frontend/backend/cloud options, cost breakdowns, and the tradeoffs around efficiency, security, and turnaround time
+- A `Chatbot` tab that references the uploaded HLDD context, recommends the best-fit model for the current stack, and answers questions about project functionality, framework choices, alternate frontend/backend/cloud options, cost breakdowns, and the tradeoffs around efficiency, security, and turnaround time
+- A separate `Agent` tab with a LangGraph-based Agentic AI that autonomously parses HLDD documents, generates project plans, answers questions via Gemini, and creates JIRA items (Epics, Stories, Subtasks) with human-in-the-loop confirmation
 - The chatbot returns `Out of Scope Information` when the prompt is unrelated to the uploaded HLDD context
 - The `Structure` tab uses a side-by-side layout — directory tree on the left, quick overview card on the right
 - **JIRA integration** — a `Create in JIRA` button in the Features tab that creates JIRA issues for each feature in the SCRUM project, with feature ID and title as the issue summary
 
-## LLM, RAG, and MCP status
+## LLM, RAG, MCP, and Agentic AI status
 
-- **LLM:** The chatbot supports optional external model calls through **OpenAI** and **Google Gemini**. The backend recommends **OpenAI `gpt-4.1-mini`** for the current React + FastAPI + PostgreSQL + Docker stack and falls back to a local response when no API key is configured.
-- **RAG:** **No RAG pipeline is implemented** in the current application.
-- **MCP:** **No MCP server or MCP tool integration is implemented** in the current application.
+- **LLM:** The chatbot supports optional external model calls through **OpenAI**, **Google Gemini**, and **Groq**. The LangGraph Agent uses **Groq (`llama-3.1-8b-instant`)** by default (falls back to Gemini if no `GROQ_API_KEY` is set, or to a local response when no API keys are configured). Set `GROQ_MODEL` to use a different model (e.g. `llama-3.3-70b-versatile` for higher quality).
+- **RAG:** **Implemented** — ChromaDB vector store indexes HLDD document chunks on upload. The agent has a `retrieve_hldd_context` tool for vector search. See `backend/app/rag.py`.
+- **MCP:** **Implemented** — HTTP endpoint at `POST /mcp/call` exposes parse_hldd, generate_plan, and ask_chatbot tools. Standalone stdio MCP server at `backend/app/mcp_server.py`. The agent has a `mcp_call` tool.
+- **Agentic AI (LangGraph):** **Implemented** — a LangGraph-based agent at `backend/app/agent/` provides autonomous multi-step reasoning with tool-calling. The agent can parse HLDD documents, generate project plans, ask Gemini for analysis, and create JIRA items (Epics, Stories, Subtasks) using the same logic as the manual endpoints. It uses `gemini-2.5-flash-lite` bound with tool definitions and follows a ReAct loop (Agent → Tool → Agent → Tool → END). Human-in-the-loop is enforced: the agent always asks for confirmation before creating any JIRA items. Access via `POST /api/agent` with `{ prompt, hldd_text, history, confirm }`.
 
 ## Copilot agent instructions
 
@@ -158,7 +160,43 @@ Use the upload panel to select a `.txt`, `.md`, `.docx`, or `.pdf` HLDD document
 - If you want live model calls, configure `OPENAI_API_KEY` or `GEMINI_API_KEY` in the backend environment before starting the server.
 - If no API key is configured, the backend still returns a context-aware fallback response so the tab remains usable.
 
-### 9. Sync features to JIRA
+### 9. Use the Agentic AI Chat
+
+The `Agent` tab provides a conversational interface to the LangGraph agent.
+
+**Upload HLDD to the agent:**
+1. Open the `Agent` tab in the navigation bar
+2. Use the file upload card at the top to select a `.txt`, `.md`, `.docx`, or `.pdf` HLDD document
+3. For `.pdf` and `.docx` files, the frontend uploads to `POST /api/extract-text` first to extract the text, then passes it to the agent
+4. The agent automatically parses the document and generates a project plan
+5. Continue the conversation: ask questions, request JIRA sync, or get recommendations
+
+**Type messages directly:**
+- Ask the agent to parse HLDD text, generate plans, answer questions, or create JIRA items
+- The agent remembers conversation history across messages
+- Before creating JIRA items, the agent asks for confirmation — respond "Yes" to proceed
+
+**Example prompts for the agent:**
+| Prompt | What the agent does |
+|--------|-------------------|
+| "Upload an HLDD file and parse it" | Prompts user to upload; agent auto-parses on file select |
+| "What can you do? Describe your capabilities" | Lists all tools and workflows |
+| "Summarize the current HLDD delivery plan" | Summarizes the parsed plan |
+| "Create Epics in JIRA for all features" | Creates Epics (asks confirmation first) |
+| "Create Stories linked to the Epics" | Creates Stories for each feature (asks confirmation) |
+| "Create Subtasks for all Stories" | Creates Subtasks (asks confirmation) |
+| "Compare AWS vs GCP for this project" | Calls ask_gemini tool for analysis |
+| "What are the risks in this project?" | Calls ask_gemini for risk assessment |
+| "Yes" / "Proceed" | Confirms pending JIRA action |
+| "No" / "Cancel" | Cancels pending JIRA action |
+
+**API usage:**
+- Send `POST /api/agent` with `{ prompt, hldd_text, history }`.
+- The agent parses the HLDD, generates a project plan, and decides which tools to call.
+- Before creating JIRA items, the agent asks for confirmation. Send `{ prompt: "yes" }` to proceed.
+- Requires `GROQ_API_KEY` (preferred) or `GEMINI_API_KEY` environment variable.
+
+### 10. Sync features to JIRA
 
 - Open the `Features` tab and click **Create in JIRA** to push all features as **Epics** in the SCRUM project.
 - Each feature becomes an Epic with its ID and title as the summary.
@@ -172,14 +210,17 @@ Use the upload panel to select a `.txt`, `.md`, `.docx`, or `.pdf` HLDD document
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `OPENAI_API_KEY` | No | Enables live OpenAI model calls in the Chatbot Agent |
-| `GEMINI_API_KEY` | No | Enables live Google Gemini model calls in the Chatbot Agent |
+| `GEMINI_API_KEY` | No | Enables live Google Gemini model calls in the Chatbot Agent; also used as fallback for the LangGraph Agent when `GROQ_API_KEY` is not set |
+| `GROQ_API_KEY` | No | Enables Groq (llama-3.1-8b-instant) for the LangGraph Agentic AI endpoint. Preferred over `GEMINI_API_KEY` when both are set |
+| `GROQ_MODEL` | No | Override the default Groq model (default: `llama-3.1-8b-instant`; use `llama-3.3-70b-versatile` for higher quality on paid tiers) |
 | `JIRA_EMAIL` | For JIRA | Email address for JIRA Cloud authentication |
 | `JIRA_API_TOKEN` | For JIRA | API token for JIRA Cloud authentication (generate at https://id.atlassian.com/manage/api-tokens) |
+| `CHROMA_PERSIST_DIR` | No | Directory for persistent ChromaDB storage (default: ephemeral in-memory) |
 
-Example backend start command with JIRA configured:
+Example backend start command with Groq and JIRA configured:
 
 ```bash
-JIRA_EMAIL=your-email@example.com JIRA_API_TOKEN=your-api-token \
+GROQ_API_KEY=gsk_... JIRA_EMAIL=your-email@example.com JIRA_API_TOKEN=your-api-token \
   /Users/jaimin/Documents/HLDD-AI/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 

@@ -10,6 +10,7 @@ const tabs = [
   'architecture',
   'structure',
   'chatbot',
+  'agent',
 ]
 
 const EMPTY_PAYLOAD = {
@@ -158,6 +159,15 @@ export default function App() {
   const [chatbotResponse, setChatbotResponse] = useState('')
   const [chatbotError, setChatbotError] = useState('')
   const [chatbotLoading, setChatbotLoading] = useState(false)
+  const [agentMessages, setAgentMessages] = useState([])
+  const [agentInput, setAgentInput] = useState('')
+  const [agentLoading, setAgentLoading] = useState(false)
+  const [agentError, setAgentError] = useState('')
+  const [agentFile, setAgentFile] = useState(null)
+  const [agentFileText, setAgentFileText] = useState('')
+  const [agentContext, setAgentContext] = useState(null)
+  const [agentJiraPending, setAgentJiraPending] = useState(null)
+  const [agentJiraConfirming, setAgentJiraConfirming] = useState(false)
   const [localFeatures, setLocalFeatures] = useState([])
   const [localStories, setLocalStories] = useState([])
   const [localTestingStories, setLocalTestingStories] = useState([])
@@ -458,6 +468,14 @@ flowchart LR
     ]
   }, [data])
 
+  const agentPrompts = useMemo(() => [
+    'Parse this HLDD and summarize the delivery plan',
+    'Create Epics, Stories, and Subtasks in JIRA for all features',
+    'Compare AWS vs GCP for this project',
+    'What are the top risks and mitigations?',
+    'Generate a project plan with stories and test cases',
+  ], [])
+
   const handleChatbotGenerate = async () => {
     if (!data) {
       setChatbotError('Upload an HLDD document first so the chatbot can use the extracted context.')
@@ -491,6 +509,115 @@ flowchart LR
     } finally {
       setChatbotLoading(false)
     }
+  }
+
+  const handleAgentFileChange = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setAgentFile(file)
+    try {
+      const text = await file.text()
+      setAgentFileText(text)
+      setAgentMessages(prev => [...prev, { role: 'user', content: `Uploaded: ${file.name} (${text.length} chars)` }])
+    } catch {
+      setAgentError('Could not read file as text. Try .txt or .md files.')
+    }
+  }
+
+  const handleAgentSend = async () => {
+    const prompt = agentInput.trim()
+    if (!prompt && !agentFileText) return
+
+    const hlddText = agentFileText || ''
+
+    if (prompt) {
+      setAgentMessages(prev => [...prev, { role: 'user', content: prompt }])
+    }
+
+    setAgentLoading(true)
+    setAgentError('')
+    setAgentJiraPending(null)
+
+    const history = agentMessages.map(m => ({ role: m.role, content: m.content }))
+
+    try {
+      const response = await fetch('http://localhost:8000/api/agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: prompt || 'Parse this HLDD document', hldd_text: hlddText, history }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.detail || 'Agent request failed.')
+      }
+
+      const payload = await response.json()
+      setAgentMessages(prev => [...prev, { role: 'assistant', content: payload.response }])
+      if (payload.state?.parsed || payload.state?.plan) {
+        setAgentContext(payload.state)
+      }
+      if (payload.jira_pending) {
+        setAgentJiraPending(payload.jira_pending)
+      }
+      setAgentInput('')
+      setAgentFile(null)
+      setAgentFileText('')
+    } catch (error) {
+      setAgentError(error.message || 'Agent request failed.')
+    } finally {
+      setAgentLoading(false)
+    }
+  }
+
+  const handleJiraApprove = async () => {
+    const plan = agentContext?.plan
+    if (!plan) return
+
+    setAgentJiraConfirming(true)
+    setAgentError('')
+    try {
+      const response = await fetch('http://localhost:8000/api/agent/confirm-jira', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan }),
+      })
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.detail || 'JIRA creation failed.')
+      }
+      const result = await response.json()
+      const epicCount = result.results?.epics?.length || 0
+      const storyCount = result.results?.stories?.length || 0
+      const testCount = result.results?.testing?.length || 0
+      const keys = [
+        ...(result.results?.epics || []).map(e => e.jira_key),
+        ...(result.results?.stories || []).map(s => s.jira_key),
+        ...(result.results?.testing || []).map(t => t.jira_key),
+      ]
+      setAgentMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `✅ **JIRA items created successfully!**\n\n• ${epicCount} Epic(s)\n• ${storyCount} Story(ies)\n• ${testCount} Subtask(s)\n\nKeys: ${keys.join(', ')}`
+      }])
+      setAgentJiraPending(null)
+      setAgentContext(prev => prev ? {
+        ...prev,
+        epics: { ...(prev.epics || {}), ...result.epic_mapping },
+        stories: { ...(prev.stories || {}), ...result.story_mapping },
+      } : prev)
+    } catch (error) {
+      setAgentError(error.message || 'JIRA confirmation failed.')
+    } finally {
+      setAgentJiraConfirming(false)
+    }
+  }
+
+  const handleJiraDeny = async () => {
+    setAgentMessages(prev => [...prev, {
+      role: 'assistant',
+      content: '❌ JIRA creation was cancelled.'
+    }])
+    setAgentJiraPending(null)
   }
 
   useEffect(() => {
@@ -957,6 +1084,9 @@ flowchart LR
               )}
               {tab === 'chatbot' && (
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              )}
+              {tab === 'agent' && (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16.01"/><line x1="16" y1="16" x2="16" y2="16.01"/></svg>
               )}
             </span>
             {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -1672,6 +1802,157 @@ flowchart LR
                 </div>
               )}
             </div>
+          </section>
+        )}
+
+        {activeTab === 'agent' && (
+          <section className="panel chatbot-panel" style={{maxWidth: 900, margin: '0 auto'}}>
+            <div className="chatbot-header">
+              <svg className="chatbot-ai-icon" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <defs>
+                  <linearGradient id="agent-grad" x1="4" y1="4" x2="48" y2="48">
+                    <stop offset="0%" stopColor="#f59e0b"/>
+                    <stop offset="50%" stopColor="#ef4444"/>
+                    <stop offset="100%" stopColor="#ec4899"/>
+                  </linearGradient>
+                </defs>
+                <rect x="10" y="16" width="32" height="20" rx="4" stroke="url(#agent-grad)" strokeWidth="1.6" fill="rgba(245,158,11,0.04)"/>
+                <circle cx="26" cy="10" r="4" stroke="url(#agent-grad)" strokeWidth="1.6" fill="rgba(245,158,11,0.04)"/>
+                <line x1="26" y1="14" x2="26" y2="18" stroke="url(#agent-grad)" strokeWidth="1.6" strokeLinecap="round"/>
+                <line x1="20" y1="23" x2="32" y2="23" stroke="url(#agent-grad)" strokeWidth="1.6" strokeLinecap="round"/>
+                <line x1="20" y1="29" x2="28" y2="29" stroke="url(#agent-grad)" strokeWidth="1.6" strokeLinecap="round"/>
+              </svg>
+              <div>
+                <h2>Agentic AI</h2>
+                <p className="note">
+                  The LangGraph agent can parse HLDD documents, generate project plans, answer questions via Gemini,
+                  create JIRA Epics/Stories/Subtasks, and execute multi-step workflows autonomously. It uses
+                  <strong> Groq (llama-3.1-8b-instant)</strong> as its default LLM with Gemini fallback.
+                </p>
+              </div>
+            </div>
+
+            <div className="chatbot-suggested-prompts">
+              <h3>Suggested prompts</h3>
+              <div className="prompt-pills">
+                {agentPrompts.map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    className="prompt-pill"
+                    onClick={() => setAgentInput(prompt)}
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {agentJiraPending && (
+              <div style={{padding: 16, background: 'linear-gradient(135deg, #1e293b, #0f172a)', borderRadius: 12, border: '1px solid #f59e0b', marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center'}}>
+                <p style={{margin: 0, color: '#fbbf24', fontWeight: 600, fontSize: '0.95rem'}}>
+                  ⚠️ JIRA Creation Pending Approval
+                </p>
+                <p style={{margin: 0, color: '#cbd5e1', fontSize: '0.85rem', textAlign: 'center'}}>
+                  The agent wants to create Epics, Stories, and Subtasks in JIRA.<br />
+                  Review the plan above and approve or deny.
+                </p>
+                <div style={{display: 'flex', gap: 10}}>
+                  <button
+                    type="button"
+                    style={{background: '#22c55e', color: '#052e16', border: 'none', padding: '8px 24px', borderRadius: 8, fontWeight: 600, cursor: 'pointer'}}
+                    onClick={handleJiraApprove}
+                    disabled={agentJiraConfirming}
+                  >
+                    {agentJiraConfirming ? 'Creating...' : '✅ Approve'}
+                  </button>
+                  <button
+                    type="button"
+                    style={{background: '#ef4444', color: '#fff', border: 'none', padding: '8px 24px', borderRadius: 8, fontWeight: 600, cursor: 'pointer'}}
+                    onClick={handleJiraDeny}
+                    disabled={agentJiraConfirming}
+                  >
+                    ❌ Deny
+                  </button>
+                </div>
+              </div>
+            )}
+            <div className="chat-messages" style={{maxHeight: 400, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, padding: 12, background: '#0f172a', borderRadius: 12, border: '1px solid #334155'}}>
+              {agentMessages.length === 0 && (
+                <div className="chat-messages-empty">
+                  <p>Send a message to start a conversation with the agent. Upload an HLDD file or just ask a question.</p>
+                </div>
+              )}
+              {agentMessages.map((msg, i) => (
+                <div key={i} className={`chat-message ${msg.role}`}>
+                  <span className="sender-label">{msg.role === 'user' ? 'You' : 'Agent'}</span>
+                  <div className="bubble"><p style={{whiteSpace: 'pre-wrap', margin: 0}}>{msg.content}</p></div>
+                </div>
+              ))}
+              {agentLoading && (
+                <div className="chat-message agent">
+                  <span className="sender-label">Agent</span>
+                  <div className="bubble">
+                    <p style={{margin: 0}}>
+                      Thinking<span className="chatbot-loading-dots"><span></span><span></span><span></span></span>
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {agentFile && (
+              <p className="note" style={{color: '#fbbf24'}}>Attached: {agentFile.name}</p>
+            )}
+
+            <div style={{display: 'flex', flexDirection: 'column', gap: 10}}>
+              <label className="field-label" style={{fontSize: '0.82rem', color: '#94a3b8'}}>
+                Upload HLDD file (optional)
+                <input
+                  type="file"
+                  accept=".txt,.md,.docx,.pdf"
+                  onChange={handleAgentFileChange}
+                  style={{marginLeft: 10, color: '#cbd5e1', fontSize: '0.82rem'}}
+                />
+              </label>
+              <div className="chat-input-row">
+                <textarea
+                  value={agentInput}
+                  onChange={(e) => setAgentInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAgentSend(); } }}
+                  placeholder="Ask the agent to parse HLDD, generate plans, answer questions, or create JIRA items..."
+                  rows="2"
+                />
+                <button
+                  type="button"
+                  className="chat-send-btn"
+                  onClick={handleAgentSend}
+                  disabled={agentLoading || (!agentInput.trim() && !agentFileText)}
+                >
+                  {agentLoading ? '...' : 'Send'}
+                </button>
+              </div>
+
+              <button
+                type="button"
+                className="secondary-button"
+                style={{alignSelf: 'flex-start'}}
+                onClick={() => {
+                  setAgentMessages([])
+                  setAgentInput('')
+                  setAgentError('')
+                  setAgentContext(null)
+                  setAgentFile(null)
+                  setAgentFileText('')
+                  setAgentJiraPending(null)
+                  setAgentJiraConfirming(false)
+                }}
+              >
+                Clear conversation
+              </button>
+            </div>
+
+            {agentError && <p className="note" style={{color: '#f87171', marginTop: 8}}>{agentError}</p>}
           </section>
         )}
       </main>

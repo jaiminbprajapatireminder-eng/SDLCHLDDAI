@@ -40,6 +40,8 @@ KNOWN_TECH = [
     "aws",
     "kubernetes",
     "angular",
+    "express",
+    "typescript",
     "java",
     "spring boot",
     "oracle",
@@ -64,6 +66,8 @@ TECHNOLOGY_ALIASES = {
     "aws": "AWS",
     "docker": "Docker",
     "react": "React",
+    "express": "Express",
+    "typescript": "TypeScript",
     "fastapi": "FastAPI",
     "python": "Python",
     "mysql": "MySQL",
@@ -174,8 +178,15 @@ def _normalize_technology(line: str) -> Optional[str]:
     if "spring" in lowered and "boot" in lowered:
         return "Spring Boot"
 
-    if any(keyword in lowered for keyword in KNOWN_TECH):
-        return cleaned
+    matched_keyword = None
+    for keyword in sorted(KNOWN_TECH, key=len, reverse=True):
+        if keyword in lowered:
+            matched_keyword = keyword
+            break
+
+    if matched_keyword:
+        alias_key = matched_keyword
+        return TECHNOLOGY_ALIASES.get(alias_key, matched_keyword.title() if matched_keyword.islower() else matched_keyword)
 
     return None
 
@@ -206,7 +217,22 @@ def _split_technology_candidates(line: str) -> List[str]:
     if matches:
         return [phrase for _, _, phrase in sorted(matches, key=lambda item: item[0])]
 
-    return [normalized]
+    found = []
+    for phrase in sorted(terms, key=len, reverse=True):
+        if phrase in lowered:
+            found.append(phrase)
+            lowered = lowered.replace(phrase, " " * len(phrase), 1)
+
+    if found:
+        seen = set()
+        unique = []
+        for item in found:
+            if item not in seen:
+                seen.add(item)
+                unique.append(item)
+        return unique
+
+    return []
 
 
 def _match_tool(line: str) -> Optional[str]:
@@ -399,9 +425,10 @@ def parse_hldd_document(text: str) -> Dict[str, object]:
 
     if not technology_stack:
         for line in lines:
-            clean = _strip_bullet(line)
-            if clean and any(keyword in clean.lower() for keyword in KNOWN_TECH):
-                technology_stack.append(clean)
+            for candidate in _split_technology_candidates(line):
+                normalized = _normalize_technology(candidate)
+                if normalized and normalized not in technology_stack:
+                    technology_stack.append(normalized)
 
     if repository == "Not specified":
         for line in lines:
